@@ -1,16 +1,17 @@
 # -*- coding: utf-8 -*-
 from Acquisition import aq_inner
 from Acquisition import aq_parent
-from Products.Archetypes.interfaces import IBaseFolder
-from Products.Archetypes.interfaces import IBaseObject
 from plone.restapi.interfaces import IFieldSerializer
 from plone.restapi.interfaces import ISerializeToJson
 from plone.restapi.interfaces import ISerializeToJsonSummary
+from Products.Archetypes.interfaces import IBaseFolder
+from Products.Archetypes.interfaces import IBaseObject
+from Products.CMFCore.utils import getToolByName
 from zope.component import adapter
 from zope.component import getMultiAdapter
 from zope.component import queryMultiAdapter
-from zope.interface import Interface
 from zope.interface import implementer
+from zope.interface import Interface
 
 
 @implementer(ISerializeToJson)
@@ -54,10 +55,17 @@ class SerializeToJson(object):
 @adapter(IBaseFolder, Interface)
 class SerializeFolderToJson(SerializeToJson):
 
+    def _query_for_children(self):
+        catalog = getToolByName(self.context, 'portal_catalog')
+        path = '/'.join(self.context.getPhysicalPath())
+        query = {'path': {'depth': 1, 'query': path}}
+        return catalog(query)
+
     def __call__(self):
         result = super(SerializeFolderToJson, self).__call__()
+        children = self._query_for_children()
         result['member'] = [
-            getMultiAdapter((member, self.request), ISerializeToJsonSummary)()
-            for member in self.context.objectValues()
+            getMultiAdapter((brain, self.request), ISerializeToJsonSummary)()
+            for brain in children
         ]
         return result

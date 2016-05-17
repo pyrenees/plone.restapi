@@ -11,12 +11,13 @@ from plone.restapi.interfaces import ISerializeToJson
 from plone.restapi.interfaces import ISerializeToJsonSummary
 from plone.restapi.serializer.converters import json_compatible
 from plone.supermodel.utils import mergedTaggedValueDict
+from Products.CMFCore.utils import getToolByName
 from zope.component import adapter
 from zope.component import getMultiAdapter
 from zope.component import queryMultiAdapter
 from zope.component import queryUtility
-from zope.interface import Interface
 from zope.interface import implementer
+from zope.interface import Interface
 from zope.schema import getFields
 from zope.security.interfaces import IPermission
 
@@ -83,10 +84,17 @@ class SerializeToJson(object):
 @adapter(IDexterityContainer, Interface)
 class SerializeFolderToJson(SerializeToJson):
 
+    def _query_for_children(self):
+        catalog = getToolByName(self.context, 'portal_catalog')
+        path = '/'.join(self.context.getPhysicalPath())
+        query = {'path': {'depth': 1, 'query': path}}
+        return catalog(query)
+
     def __call__(self):
         result = super(SerializeFolderToJson, self).__call__()
+        brains = self._query_for_children()
         result['member'] = [
-            getMultiAdapter((member, self.request), ISerializeToJsonSummary)()
-            for member in self.context.objectValues()
+            getMultiAdapter((brain, self.request), ISerializeToJsonSummary)()
+            for brain in brains
         ]
         return result
